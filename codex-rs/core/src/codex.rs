@@ -257,6 +257,7 @@ use crate::hook_runtime::inspect_pending_input;
 use crate::hook_runtime::record_additional_contexts;
 use crate::hook_runtime::record_pending_input;
 use crate::hook_runtime::run_pending_session_start_hooks;
+use crate::hook_runtime::run_notification_hooks;
 use crate::hook_runtime::run_user_prompt_submit_hooks;
 use crate::injection::ToolMentionKind;
 use crate::injection::app_id_from_path;
@@ -3026,6 +3027,7 @@ impl Session {
                 additional_permissions.as_ref(),
             )
         });
+        let command_str = command.join(" ");
         let event = EventMsg::ExecApprovalRequest(ExecApprovalRequestEvent {
             call_id,
             approval_id,
@@ -3040,6 +3042,7 @@ impl Session {
             available_decisions: Some(available_decisions),
             parsed_cmd,
         });
+        run_notification_hooks(self, turn_context, format!("Approval: {command_str}")).await;
         self.send_event(turn_context, event).await;
         rx_approve.await.unwrap_or(ReviewDecision::Abort)
     }
@@ -3076,6 +3079,7 @@ impl Session {
             reason,
             grant_root,
         });
+        run_notification_hooks(self, turn_context, "Patch approval requested".to_string()).await;
         self.send_event(turn_context, event).await;
         rx_approve
     }
@@ -3158,11 +3162,17 @@ impl Session {
             warn!("Overwriting existing pending user input for sub_id: {event_id}");
         }
 
+        let notification_message = args
+            .questions
+            .first()
+            .map(|q| q.question.clone())
+            .unwrap_or_default();
         let event = EventMsg::RequestUserInput(RequestUserInputEvent {
             call_id,
             turn_id: turn_context.sub_id.clone(),
             questions: args.questions,
         });
+        run_notification_hooks(self, turn_context, notification_message).await;
         self.send_event(turn_context, event).await;
         rx_response.await.ok()
     }
@@ -3238,10 +3248,16 @@ impl Session {
         };
         let event = EventMsg::ElicitationRequest(ElicitationRequestEvent {
             turn_id: params.turn_id,
-            server_name,
+            server_name: server_name.clone(),
             id,
             request,
         });
+        run_notification_hooks(
+            self,
+            turn_context,
+            format!("Elicitation: {server_name}"),
+        )
+        .await;
         self.send_event(turn_context, event).await;
         rx_response.await.ok()
     }

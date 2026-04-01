@@ -10,6 +10,8 @@ use std::path::PathBuf;
 use codex_config::ConfigLayerStack;
 use codex_protocol::protocol::HookRunSummary;
 
+use crate::events::notification::NotificationOutcome;
+use crate::events::notification::NotificationRequest;
 use crate::events::post_tool_use::PostToolUseOutcome;
 use crate::events::post_tool_use::PostToolUseRequest;
 use crate::events::pre_tool_use::PreToolUseOutcome;
@@ -55,6 +57,7 @@ impl ConfiguredHandler {
             codex_protocol::protocol::HookEventName::SessionStart => "session-start",
             codex_protocol::protocol::HookEventName::UserPromptSubmit => "user-prompt-submit",
             codex_protocol::protocol::HookEventName::Stop => "stop",
+            codex_protocol::protocol::HookEventName::Notification => "notification",
         }
     }
 }
@@ -161,5 +164,19 @@ impl ClaudeHooksEngine {
 
     pub(crate) async fn run_stop(&self, request: StopRequest) -> StopOutcome {
         crate::events::stop::run(&self.handlers, &self.shell, request).await
+    }
+
+    pub(crate) fn preview_notification(
+        &self,
+        request: &NotificationRequest,
+    ) -> Vec<HookRunSummary> {
+        crate::events::notification::preview(&self.handlers, request)
+    }
+
+    pub(crate) async fn run_notification(
+        &self,
+        request: NotificationRequest,
+    ) -> NotificationOutcome {
+        crate::events::notification::run(&self.handlers, &self.shell, request).await
     }
 }

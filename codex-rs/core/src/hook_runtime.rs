@@ -1,6 +1,7 @@
 use std::future::Future;
 use std::sync::Arc;
 
+use codex_hooks::NotificationRequest;
 use codex_hooks::PostToolUseOutcome;
 use codex_hooks::PostToolUseRequest;
 use codex_hooks::PreToolUseOutcome;
@@ -193,6 +194,38 @@ pub(crate) async fn run_user_prompt_submit_hooks(
         sess.hooks().run_user_prompt_submit(request),
     )
     .await
+}
+
+pub(crate) async fn run_notification_hooks(
+    sess: &Session,
+    turn_context: &TurnContext,
+    message: String,
+) {
+    let request = NotificationRequest {
+        session_id: sess.conversation_id,
+        turn_id: turn_context.sub_id.clone(),
+        cwd: turn_context.cwd.to_path_buf(),
+        transcript_path: sess.hook_transcript_path().await,
+        model: turn_context.model_info.slug.clone(),
+        permission_mode: hook_permission_mode(turn_context),
+        message,
+    };
+    let preview_runs = sess.hooks().preview_notification(&request);
+    for run in preview_runs {
+        sess.send_event(
+            turn_context,
+            EventMsg::HookStarted(crate::protocol::HookStartedEvent {
+                turn_id: Some(turn_context.sub_id.clone()),
+                run,
+            }),
+        )
+        .await;
+    }
+    let outcome = sess.hooks().run_notification(request).await;
+    for completed in outcome.hook_events {
+        sess.send_event(turn_context, EventMsg::HookCompleted(completed))
+            .await;
+    }
 }
 
 pub(crate) async fn inspect_pending_input(

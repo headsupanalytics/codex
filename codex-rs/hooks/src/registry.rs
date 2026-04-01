@@ -3,6 +3,8 @@ use tokio::process::Command;
 
 use crate::engine::ClaudeHooksEngine;
 use crate::engine::CommandShell;
+use crate::events::notification::NotificationOutcome;
+use crate::events::notification::NotificationRequest;
 use crate::events::post_tool_use::PostToolUseOutcome;
 use crate::events::post_tool_use::PostToolUseRequest;
 use crate::events::pre_tool_use::PreToolUseOutcome;
@@ -149,6 +151,17 @@ impl Hooks {
 
     pub async fn run_stop(&self, request: StopRequest) -> StopOutcome {
         self.engine.run_stop(request).await
+    }
+
+    pub fn preview_notification(
+        &self,
+        request: &NotificationRequest,
+    ) -> Vec<codex_protocol::protocol::HookRunSummary> {
+        self.engine.preview_notification(request)
+    }
+
+    pub async fn run_notification(&self, request: NotificationRequest) -> NotificationOutcome {
+        self.engine.run_notification(request).await
     }
 }
 
